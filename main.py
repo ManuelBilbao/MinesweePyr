@@ -47,11 +47,16 @@ class Tablero:
             celda.tieneBandera = True
             self.banderas += 1
 
-def minas_alrededor(tablero: Tablero, fila: int, columna: int) -> int:
+def submatriz(tablero: Tablero, fila: int, columna: int) -> (int, int, int, int):
     inicio_fila = fila - 1 if fila > 0 else fila
     inicio_columna = columna - 1 if columna > 0 else columna
     fin_fila = fila + 1 if fila < len(tablero.celdas)-1 else fila
     fin_columna = columna + 1 if columna < len(tablero.celdas[0])-1 else columna
+
+    return inicio_fila, inicio_columna, fin_fila, fin_columna
+
+def minas_alrededor(tablero: Tablero, fila: int, columna: int) -> int:
+    inicio_fila, inicio_columna, fin_fila, fin_columna = submatriz(tablero, fila, columna)
 
     minas = 0
     for i in range(inicio_fila, fin_fila+1):
@@ -59,6 +64,17 @@ def minas_alrededor(tablero: Tablero, fila: int, columna: int) -> int:
             if tablero.celdas[i][j].esMina:
                 minas += 1
     return minas
+
+def banderas_alrededor(tablero: Tablero, fila: int, columna: int) -> int:
+    inicio_fila, inicio_columna, fin_fila, fin_columna = submatriz(tablero, fila, columna)
+
+    banderas = 0
+    for i in range(inicio_fila, fin_fila+1):
+        for j in range(inicio_columna, fin_columna+1):
+            if tablero.celdas[i][j].tieneBandera:
+                banderas += 1
+
+    return banderas
 
 def inicializar_juego(filas: int, columnas: int, minas: int) -> Tablero:
     posicionesMinas = []
@@ -89,10 +105,7 @@ def expandir_cero(tablero: Tablero, fila: int, columna: int) -> None:
     if tablero.celdas[fila][columna].minasAlrededor != 0:
         return
 
-    inicio_fila = fila - 1 if fila > 0 else fila
-    inicio_columna = columna - 1 if columna > 0 else columna
-    fin_fila = fila + 1 if fila < len(tablero.celdas)-1 else fila
-    fin_columna = columna + 1 if columna < len(tablero.celdas[0])-1 else columna
+    inicio_fila, inicio_columna, fin_fila, fin_columna = submatriz(tablero, fila, columna)
 
     for i in range(inicio_fila, fin_fila+1):
         for j in range(inicio_columna, fin_columna+1):
@@ -100,6 +113,25 @@ def expandir_cero(tablero: Tablero, fila: int, columna: int) -> None:
                 tablero.setVisibilidad(i, j)
                 if tablero.celdas[i][j].minasAlrededor == 0:
                     expandir_cero(tablero, i, j)
+
+def expandir_visible(tablero: Tablero, fila: int, columna: int) -> bool:
+    if tablero.celdas[fila][columna].minasAlrededor != banderas_alrededor(tablero, fila, columna):
+        return True
+
+    inicio_fila, inicio_columna, fin_fila, fin_columna = submatriz(tablero, fila, columna)
+
+    success = True
+    for i in range(inicio_fila, fin_fila+1):
+        for j in range(inicio_columna, fin_columna+1):
+            celda = tablero.celdas[i][j]
+            if not celda.visible and not celda.tieneBandera:
+                tablero.setVisibilidad(i, j)
+                expandir_cero(tablero, i, j)
+                if celda.esMina:
+                    tablero.explotado = celda
+                    succes = False
+
+    return success
 
 def mostrar_ayuda() -> None:
     print("Esta es la ayuda")
@@ -152,11 +184,16 @@ def realizar_jugada(tablero: Tablero) -> int:
 
     if bandera:
         tablero.toggleBandera(fila, columna)
-    else:
-        if tablero.celdas[fila][columna].tieneBandera:
-            return 0
-        expandir_cero(tablero, fila, columna)
-        tablero.setVisibilidad(celda.posicion[0], celda.posicion[1])
+        return 0
+
+    if celda.tieneBandera:
+        return 0
+
+    if celda.visible and not expandir_visible(tablero, fila, columna):
+            return -1
+
+    expandir_cero(tablero, fila, columna)
+    tablero.setVisibilidad(fila, columna)
 
     if celda.esMina and not bandera:
         tablero.explotado = celda
